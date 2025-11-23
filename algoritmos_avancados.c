@@ -1,11 +1,10 @@
-#include <stdio.h>
+
 
 // Desafio Detective Quest
 // Tema 4 - Árvores e Tabela Hash
 // Este código inicial serve como base para o desenvolvimento das estruturas de navegação, pistas e suspeitos.
 // Use as instruções de cada região para desenvolver o sistema completo com árvore binária, árvore de busca e tabela hash.
 
-int main() {
 
     // 🌱 Nível Novato: Mapa da Mansão com Árvore Binária
     //
@@ -41,6 +40,198 @@ int main() {
     // - Para hashing simples, pode usar soma dos valores ASCII do nome ou primeira letra.
     // - Em caso de colisão, use lista encadeada para tratar.
     // - Modularize com funções como inicializarHash(), buscarSuspeito(), listarAssociacoes().
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+//   NÍVEL 1 — Árvore Binária
+
+struct Sala {
+    char nome[50];
+    char pista[50];      // pista opcional
+    char suspeito[50];   // suspeito da pista
+    struct Sala *esq;
+    struct Sala *dir;
+};
+
+struct Sala* criarSala(char nome[], char pista[], char suspeito[]) {
+    struct Sala *s = (struct Sala*) malloc(sizeof(struct Sala));
+    strcpy(s->nome, nome);
+    strcpy(s->pista, pista);
+    strcpy(s->suspeito, suspeito);
+    s->esq = NULL;
+    s->dir = NULL;
+    return s;
+}
+
+//   NÍVEL 2 — Árvore de Busca
+
+struct NodoBST {
+    char pista[50];
+    struct NodoBST *esq;
+    struct NodoBST *dir;
+};
+
+struct NodoBST* inserirPista(struct NodoBST *raiz, char pista[]) {
+    if (raiz == NULL) {
+        struct NodoBST *n = (struct NodoBST*) malloc(sizeof(struct NodoBST));
+        strcpy(n->pista, pista);
+        n->esq = n->dir = NULL;
+        return n;
+    }
+
+    if (strcmp(pista, raiz->pista) < 0)
+        raiz->esq = inserirPista(raiz->esq, pista);
+    else
+        raiz->dir = inserirPista(raiz->dir, pista);
+
+    return raiz;
+}
+
+void mostrarPistas(struct NodoBST *raiz) {
+    if (raiz == NULL) return;
+    mostrarPistas(raiz->esq);
+    printf(" - %s\n", raiz->pista);
+    mostrarPistas(raiz->dir);
+}
+
+//   NÍVEL 3 — Tabela Hash
+
+#define TAM_HASH 10
+
+struct ItemHash {
+    char pista[50];
+    char suspeito[50];
+    struct ItemHash *prox;
+};
+
+struct ItemHash* tabela[TAM_HASH];
+
+int funcaoHash(char pista[]) {
+    int soma = 0;
+    for (int i = 0; pista[i] != '\0'; i++)
+        soma += pista[i];
+    return soma % TAM_HASH;
+}
+
+void inserirHash(char pista[], char suspeito[]) {
+    int h = funcaoHash(pista);
+
+    struct ItemHash *novo = (struct ItemHash*) malloc(sizeof(struct ItemHash));
+    strcpy(novo->pista, pista);
+    strcpy(novo->suspeito, suspeito);
+
+    novo->prox = tabela[h];
+    tabela[h] = novo;
+}
+
+void mostrarHash() {
+    printf("\n=== Pistas e Suspeitos ===\n");
+    for (int i = 0; i < TAM_HASH; i++) {
+        struct ItemHash *aux = tabela[i];
+        while (aux != NULL) {
+            printf("%s -> %s\n", aux->pista, aux->suspeito);
+            aux = aux->prox;
+        }
+    }
+}
+
+void suspeitoMaisCitado() {
+    char nomes[20][50];
+    int cont[20];
+    int total = 0;
+
+    for (int i = 0; i < TAM_HASH; i++) {
+        struct ItemHash *a = tabela[i];
+        while (a != NULL) {
+            int achou = 0;
+            for (int j = 0; j < total; j++) {
+                if (strcmp(nomes[j], a->suspeito) == 0) {
+                    cont[j]++;
+                    achou = 1;
+                    break;
+                }
+            }
+            if (!achou) {
+                strcpy(nomes[total], a->suspeito);
+                cont[total] = 1;
+                total++;
+            }
+            a = a->prox;
+        }
+    }
+
+    if (total == 0) {
+        printf("Nenhuma pista encontrada.\n");
+        return;
+    }
+
+    int maior = 0;
+    for (int i = 1; i < total; i++) {
+        if (cont[i] > cont[maior])
+            maior = i;
+    }
+
+    printf("\n🔍 Suspeito mais citado: %s (%d pistas)\n", nomes[maior], cont[maior]);
+}
+
+//      EXPLORAÇÃO DO JOGO
+
+void explorar(struct Sala *atual, struct NodoBST **bst) {
+    char op;
+
+    while (atual != NULL) {
+        printf("\n📍 Você está em: %s\n", atual->nome);
+
+        // Se tiver pista, registrar
+        if (strlen(atual->pista) > 0) {
+            printf("🔎 Você encontrou uma pista: %s\n", atual->pista);
+
+            *bst = inserirPista(*bst, atual->pista);         // insere no BST
+            inserirHash(atual->pista, atual->suspeito);     // insere na hash
+        }
+
+        printf("Ir para (e) esquerda | (d) direita | (s) sair: ");
+        scanf(" %c", &op);
+
+        if (op == 'e') atual = atual->esq;
+        else if (op == 'd') atual = atual->dir;
+        else if (op == 's') break;
+        else printf("Opção inválida!\n");
+    }
+
+    printf("\nFim da exploração.\n");
+}
+
+//            MAIN
+
+int main() {
+    for (int i = 0; i < TAM_HASH; i++) tabela[i] = NULL;
+
+    // Criação simples da árvore da mansão
+    struct Sala *hall = criarSala("Hall de Entrada", "", "");
+
+    hall->esq = criarSala("Biblioteca", "Livro rasgado", "Sr. Black");
+    hall->dir = criarSala("Cozinha", "Faca suja", "Chef Marco");
+
+    hall->esq->esq = criarSala("Sala de Estudos", "", "");
+    hall->esq->dir = criarSala("Porão", "Pegada", "Jardineiro");
+
+    hall->dir->esq = criarSala("Despensa", "Pano queimado", "Dona Rosa");
+    hall->dir->dir = criarSala("Jardim", "", "");
+
+    struct NodoBST *pistas = NULL;
+
+    printf("=== DETECTIVE QUEST — Versão Simples ===\n");
+
+    explorar(hall, &pistas);
+
+    printf("\n=== PISTAS ENCONTRADAS ===\n");
+    mostrarPistas(pistas);
+
+    mostrarHash();
+    suspeitoMaisCitado();
 
     return 0;
 }
